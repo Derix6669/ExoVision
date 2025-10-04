@@ -1,20 +1,29 @@
 import { NextResponse } from "next/server"
+import { readFile } from "fs/promises"
+import { join } from "path"
 
 export async function GET() {
   try {
-    // Mock feature importance data
-    const featureImportance = {
-      features: [
-        { name: "KOI Score", importance: 0.28 },
-        { name: "Signal-to-Noise", importance: 0.24 },
-        { name: "Transit Depth", importance: 0.19 },
-        { name: "Planet Radius", importance: 0.15 },
-        { name: "Orbital Period", importance: 0.09 },
-        { name: "Transit Duration", importance: 0.05 },
-      ],
-    }
+    const metricsFile = join(process.cwd(), "data", "latest_metrics.json")
 
-    return NextResponse.json(featureImportance)
+    try {
+      const data = await readFile(metricsFile, "utf-8")
+      const { feature_importance } = JSON.parse(data)
+
+      // Convert to array format expected by frontend
+      const features = Object.entries(feature_importance).map(([name, importance]) => ({
+        name,
+        importance: importance as number,
+      }))
+
+      return NextResponse.json({ features })
+    } catch (fileError) {
+      console.log("[v0] No feature importance data found")
+      return NextResponse.json({
+        features: [],
+        message: "No model has been trained yet",
+      })
+    }
   } catch (error) {
     console.error("[v0] Feature importance error:", error)
     return NextResponse.json({ error: "Failed to generate feature importance" }, { status: 500 })

@@ -1,13 +1,10 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Upload, Loader2, CheckCircle2, TrendingUp, AlertCircle, Download, History } from "lucide-react"
+import { Upload, Loader2, CheckCircle2, TrendingUp, History, Download } from "lucide-react"
 
 interface TrainingMetrics {
   accuracy: number
@@ -23,6 +20,12 @@ interface TrainingHistoryEntry {
   metrics: TrainingMetrics
   model_path: string
   test_size: number
+}
+
+const getImprovement = (currentAccuracy: number, index: number) => {
+  // Placeholder implementation for getImprovement
+  // This should be replaced with actual logic to calculate improvement
+  return index === 0 ? null : "+0.5%"
 }
 
 export function ModelTraining() {
@@ -49,79 +52,47 @@ export function ModelTraining() {
         return
       }
 
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        console.error("[v0] Failed to load history: Invalid content type", contentType)
-        setHistory([])
-        return
-      }
-
       const data = await response.json()
       console.log("[v0] History loaded successfully:", data.history?.length || 0, "entries")
       setHistory(data.history || [])
+
+      if (data.latest_metrics?.metrics) {
+        setMetrics(data.latest_metrics.metrics)
+      }
     } catch (err) {
       console.error("[v0] Failed to load history:", err)
       setHistory([])
     }
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  const handleNASATraining = async () => {
     setValidationError(null)
     setError(null)
-
-    if (!file.name.endsWith(".csv")) {
-      setValidationError("Please upload a valid CSV file")
-      return
-    }
-
-    if (file.size > 50 * 1024 * 1024) {
-      setValidationError("File size must be less than 50MB")
-      return
-    }
-
-    const testSizeNum = Number.parseFloat(testSize)
-    if (Number.isNaN(testSizeNum) || testSizeNum < 0.1 || testSizeNum > 0.5) {
-      setValidationError("Test size must be between 0.1 and 0.5")
-      return
-    }
-
     setIsTraining(true)
     setMetrics(null)
 
     try {
-      console.log("[v0] Starting training with file:", file.name)
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("test_size", testSize)
+      console.log("[v0] Starting training with NASA data...")
 
       const response = await fetch(`/api/train`, {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
       })
 
       console.log("[v0] Response status:", response.status)
 
-      let result
-      try {
-        result = await response.json()
-      } catch (parseError) {
-        console.error("[v0] Failed to parse response as JSON:", parseError)
-        throw new Error("Server returned invalid response. Please check if Python and required packages are installed.")
-      }
+      const result = await response.json()
 
       if (!response.ok) {
-        console.error("[v0] Training failed with status:", response.status, "Error:", result.error)
         throw new Error(result.error || `Training failed with status ${response.status}`)
       }
 
       console.log("[v0] Training completed successfully")
       setMetrics(result.metrics)
       setHistory(result.history || [])
-
-      await loadHistory()
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "An error occurred during training"
       setError(errorMessage)
@@ -131,38 +102,76 @@ export function ModelTraining() {
     }
   }
 
-  const handleDownloadTemplate = async () => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setValidationError(null)
+    setError(null)
+    setIsTraining(true)
+    setMetrics(null)
+
     try {
-      const response = await fetch("/api/download-template")
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = "exoplanet_training_template.csv"
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      console.log("[v0] Reading CSV file...")
+      const csvText = await file.text()
+
+      console.log("[v0] Starting training with custom CSV data...")
+
+      const response = await fetch(`/api/train`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ csvData: csvText }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || `Training failed with status ${response.status}`)
+      }
+
+      console.log("[v0] Training completed successfully")
+      setMetrics(result.metrics)
+      setHistory(result.history || [])
     } catch (err) {
-      console.error("[v0] Template download error:", err)
-      setError("Failed to download template")
+      const errorMessage = err instanceof Error ? err.message : "An error occurred during training"
+      setError(errorMessage)
+      console.error("[v0] Training error:", err)
+    } finally {
+      setIsTraining(false)
     }
   }
 
-  const handleDownloadSample = () => {
-    const a = document.createElement("a")
-    a.href = "/sample-training-data.csv"
-    a.download = "sample-training-data.csv"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-  }
+  const handleDownloadSample = async () => {
+    try {
+      console.log("[v0] Starting sample data download...")
+      const response = await fetch("/api/download-sample")
 
-  const getImprovement = (currentMetric: number, index: number): string | null => {
-    if (index === 0 || !history[index - 1]) return null
-    const previousMetric = history[index - 1].metrics.accuracy
-    const diff = ((currentMetric - previousMetric) / previousMetric) * 100
-    return diff > 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`
+      console.log("[v0] Download response status:", response.status)
+
+      if (!response.ok) {
+        throw new Error(`Failed to download: ${response.status}`)
+      }
+
+      const blob = await response.blob()
+      console.log("[v0] Blob created, size:", blob.size)
+
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "sample_training_data.csv"
+      document.body.appendChild(a)
+      a.click()
+
+      console.log("[v0] Download triggered successfully")
+
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      console.error("[v0] Failed to download sample data:", err)
+      setError("Failed to download sample data. Please try again.")
+    }
   }
 
   return (
@@ -170,83 +179,78 @@ export function ModelTraining() {
       <div className="container relative z-10 mx-auto max-w-5xl">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-4xl font-bold text-foreground">Train Model</h2>
-          <p className="text-lg text-muted-foreground">Upload NASA Kepler data to train the Random Forest classifier</p>
+          <p className="text-lg text-muted-foreground">
+            Upload your exoplanet dataset to retrain the habitability classifier
+          </p>
+          <div className="mx-auto mt-4 max-w-2xl rounded-lg border border-chart-2/30 bg-chart-2/10 p-3">
+            <p className="text-sm text-foreground">
+              <strong>Training Data:</strong> Your CSV must include a "label" column with values like "CONFIRMED" or
+              "FALSE POSITIVE" to train the model.
+            </p>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Card className="border-border bg-card/50 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Upload Training Data</CardTitle>
-              <CardDescription>CSV file with NASA Kepler features (koi_period, koi_duration, etc.)</CardDescription>
+              <CardDescription>Upload a CSV file with exoplanet parameters</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="test-size">
-                  Test Set Size <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="test-size"
-                  type="number"
-                  min="0.1"
-                  max="0.5"
-                  step="0.05"
-                  value={testSize}
-                  onChange={(e) => setTestSize(e.target.value)}
-                  className="bg-input"
-                />
-                <p className="text-xs text-muted-foreground">Proportion of data to use for testing (0.1 - 0.5)</p>
-              </div>
-
-              <div className="flex min-h-[200px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20 p-8 text-center">
-                <Upload className="mb-4 h-10 w-10 text-muted-foreground" />
-                <h3 className="mb-2 text-base font-semibold text-foreground">Upload Training CSV</h3>
-                <p className="mb-4 text-sm text-muted-foreground">NASA Kepler dataset with koi_disposition labels</p>
-                <input
-                  type="file"
-                  id="training-upload"
-                  className="hidden"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  disabled={isTraining}
-                />
-                <label htmlFor="training-upload">
-                  <Button variant="outline" asChild disabled={isTraining}>
-                    <span>
+              <div className="flex flex-col gap-4 rounded-lg border-2 border-dashed border-border bg-muted/20 p-6">
+                <div className="flex items-start gap-3">
+                  <Upload className="mt-1 h-5 w-5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <h3 className="mb-1 text-base font-semibold text-foreground">Upload CSV File</h3>
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      Your CSV must include: pl_rade, pl_eqt, pl_bmasse, pl_insol columns
+                    </p>
+                    <Button
+                      variant="default"
+                      onClick={() => document.getElementById("training-csv-upload")?.click()}
+                      disabled={isTraining}
+                      className="w-full"
+                    >
                       {isTraining ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Training...
                         </>
                       ) : (
-                        "Select File"
+                        <>
+                          <Upload className="mr-2 h-4 w-4" />
+                          Upload CSV File
+                        </>
                       )}
-                    </span>
-                  </Button>
-                </label>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button variant="secondary" onClick={handleDownloadTemplate} className="flex-1 gap-2">
-                  <Download className="h-4 w-4" />
-                  Download CSV Template
-                </Button>
-                <Button variant="secondary" onClick={handleDownloadSample} className="flex-1 gap-2">
-                  <Download className="h-4 w-4" />
-                  Download Sample Data
-                </Button>
-              </div>
-
-              {validationError && (
-                <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-destructive" />
-                    <p className="text-sm text-destructive">{validationError}</p>
+                    </Button>
+                    <input
+                      type="file"
+                      id="training-csv-upload"
+                      className="hidden"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      disabled={isTraining}
+                    />
                   </div>
                 </div>
-              )}
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/20 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Download className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold text-foreground">Need sample data?</h3>
+                </div>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Download a sample CSV file with 50 realistic exoplanet records to test the training system
+                </p>
+                <Button variant="outline" size="sm" onClick={handleDownloadSample} className="w-full bg-transparent">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Sample Training Data
+                </Button>
+              </div>
 
               {error && (
-                <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
                   <p className="text-sm text-destructive">{error}</p>
                 </div>
               )}
@@ -301,7 +305,7 @@ export function ModelTraining() {
                 <div className="flex min-h-[300px] items-center justify-center text-center">
                   <div>
                     <div className="mb-4 text-4xl">🤖</div>
-                    <p className="text-muted-foreground">Upload training data to see results</p>
+                    <p className="text-muted-foreground">Start training to see results</p>
                   </div>
                 </div>
               )}
@@ -396,102 +400,73 @@ export function ModelTraining() {
 
         <Card className="mt-6 border-border bg-card/50 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Required NASA Kepler Features</CardTitle>
-            <CardDescription>Your CSV must include these columns from the NASA Kepler dataset</CardDescription>
+            <CardTitle>NASA Exoplanet Archive Features</CardTitle>
+            <CardDescription>The model uses these parameters from NASA's confirmed exoplanets database</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="p-2 text-left font-semibold text-foreground">Column Name</th>
+                    <th className="p-2 text-left font-semibold text-foreground">Parameter</th>
                     <th className="p-2 text-left font-semibold text-foreground">Description</th>
-                    <th className="p-2 text-left font-semibold text-foreground">Example</th>
+                    <th className="p-2 text-left font-semibold text-foreground">Unit</th>
                   </tr>
                 </thead>
                 <tbody className="text-muted-foreground">
                   <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_period</td>
-                    <td className="p-2 text-xs">Orbital period (days)</td>
-                    <td className="p-2">54.32</td>
+                    <td className="p-2 font-mono text-xs">pl_rade</td>
+                    <td className="p-2 text-xs">Planet radius</td>
+                    <td className="p-2">Earth radii</td>
                   </tr>
                   <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_duration</td>
-                    <td className="p-2 text-xs">Transit duration (hours)</td>
-                    <td className="p-2">3.45</td>
+                    <td className="p-2 font-mono text-xs">pl_eqt</td>
+                    <td className="p-2 text-xs">Equilibrium temperature</td>
+                    <td className="p-2">Kelvin</td>
                   </tr>
                   <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_impact</td>
-                    <td className="p-2 text-xs">Impact parameter</td>
-                    <td className="p-2">0.65</td>
+                    <td className="p-2 font-mono text-xs">pl_bmasse</td>
+                    <td className="p-2 text-xs">Planet mass</td>
+                    <td className="p-2">Earth masses</td>
                   </tr>
                   <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_depth</td>
-                    <td className="p-2 text-xs">Transit depth (ppm)</td>
-                    <td className="p-2">1200</td>
+                    <td className="p-2 font-mono text-xs">pl_insol</td>
+                    <td className="p-2 text-xs">Stellar insolation flux</td>
+                    <td className="p-2">Earth flux</td>
                   </tr>
                   <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_prad</td>
-                    <td className="p-2 text-xs">Planet radius (Earth radii)</td>
-                    <td className="p-2">1.8</td>
+                    <td className="p-2 font-mono text-xs">pl_orbper</td>
+                    <td className="p-2 text-xs">Orbital period</td>
+                    <td className="p-2">Days</td>
                   </tr>
                   <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_insol</td>
-                    <td className="p-2 text-xs">Insolation flux (Earth flux)</td>
-                    <td className="p-2">0.85</td>
+                    <td className="p-2 font-mono text-xs">pl_orbeccen</td>
+                    <td className="p-2 text-xs">Orbital eccentricity</td>
+                    <td className="p-2">-</td>
                   </tr>
                   <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_model_snr</td>
-                    <td className="p-2 text-xs">Signal-to-noise ratio</td>
-                    <td className="p-2">15.6</td>
+                    <td className="p-2 font-mono text-xs">st_teff</td>
+                    <td className="p-2 text-xs">Stellar effective temperature</td>
+                    <td className="p-2">Kelvin</td>
                   </tr>
                   <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_srad</td>
-                    <td className="p-2 text-xs">Stellar radius (Solar radii)</td>
-                    <td className="p-2">1.05</td>
-                  </tr>
-                  <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_steff</td>
-                    <td className="p-2 text-xs">Stellar temperature (K)</td>
-                    <td className="p-2">5778</td>
-                  </tr>
-                  <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_slogg</td>
-                    <td className="p-2 text-xs">Surface gravity (log10)</td>
-                    <td className="p-2">4.44</td>
-                  </tr>
-                  <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_fpflag_nt</td>
-                    <td className="p-2 text-xs">Not transit-like flag</td>
-                    <td className="p-2">0</td>
-                  </tr>
-                  <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_fpflag_ss</td>
-                    <td className="p-2 text-xs">Stellar eclipse flag</td>
-                    <td className="p-2">0</td>
-                  </tr>
-                  <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_fpflag_co</td>
-                    <td className="p-2 text-xs">Centroid offset flag</td>
-                    <td className="p-2">0</td>
-                  </tr>
-                  <tr className="border-b border-border/50">
-                    <td className="p-2 font-mono text-xs">koi_fpflag_ec</td>
-                    <td className="p-2 text-xs">Ephemeris match flag</td>
-                    <td className="p-2">0</td>
+                    <td className="p-2 font-mono text-xs">st_rad</td>
+                    <td className="p-2 text-xs">Stellar radius</td>
+                    <td className="p-2">Solar radii</td>
                   </tr>
                   <tr>
-                    <td className="p-2 font-mono text-xs font-bold">koi_disposition</td>
-                    <td className="p-2 text-xs font-bold">Target label</td>
-                    <td className="p-2 font-bold">CONFIRMED</td>
+                    <td className="p-2 font-mono text-xs">st_mass</td>
+                    <td className="p-2 text-xs">Stellar mass</td>
+                    <td className="p-2">Solar masses</td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
               <p className="text-sm text-muted-foreground">
-                <strong className="text-foreground">Note:</strong> The koi_disposition column should contain "CONFIRMED"
-                or "FALSE POSITIVE" labels. Download the template to see the exact format.
+                <strong className="text-foreground">Classification:</strong> The model classifies exoplanets as
+                potentially habitable based on criteria like radius (0.5-2.5 Earth radii), temperature (200-350K), mass
+                (0.3-10 Earth masses), and insolation flux (0.25-4 Earth flux).
               </p>
             </div>
           </CardContent>

@@ -1,31 +1,29 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, Sparkles, CheckCircle2, XCircle, Loader2, AlertCircle, Download, TrendingUp } from "lucide-react"
+import { Upload, Sparkles, CheckCircle2, XCircle, Loader2, Download } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface PredictionResult {
-  prediction: "confirmed" | "false-positive"
+  prediction: "exoplanet" | "not-exoplanet"
   confidence: number
   probabilities: {
-    false_positive: number
-    confirmed: number
+    not_exoplanet: number
+    exoplanet: number
   }
 }
 
 interface CSVResults {
   summary: {
     total: number
-    confirmed: number
-    false_positive: number
-    candidate: number
+    exoplanet: number
+    not_exoplanet: number
   }
   predictions: Array<{
     prediction: string
@@ -37,103 +35,61 @@ export function PredictionForm() {
   const [prediction, setPrediction] = useState<PredictionResult | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [csvResults, setCsvResults] = useState<CSVResults | null>(null)
   const [showResultsModal, setShowResultsModal] = useState(false)
 
-  // Form state
   const [formData, setFormData] = useState({
-    orbital_period: "",
-    transit_duration: "",
-    transit_depth: "",
-    planet_radius: "",
-    signal_to_noise: "",
-    koi_score: "",
+    // Orbital and transit properties
+    koi_period: "",
+    koi_duration: "",
+    koi_impact: "",
+    koi_depth: "",
+    koi_prad: "",
+    koi_insol: "",
+    koi_model_snr: "",
+
+    // Stellar properties
+    koi_srad: "",
+    koi_steff: "",
+    koi_slogg: "",
+
+    // False positive flags
+    koi_fpflag_nt: "0",
+    koi_fpflag_ss: "0",
+    koi_fpflag_co: "0",
+    koi_fpflag_ec: "0",
+
+    // Positional data
+    ra: "",
+    dec: "",
+    pm_ra: "",
+    pm_dec: "",
   })
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const validateInputs = (): boolean => {
-    const errors: Record<string, string> = {}
-
-    // Orbital Period: 0.1 to 10000 days
-    const period = Number.parseFloat(formData.orbital_period)
-    if (!formData.orbital_period || Number.isNaN(period)) {
-      errors.orbital_period = "Required field"
-    } else if (period < 0.1 || period > 10000) {
-      errors.orbital_period = "Must be between 0.1 and 10000 days"
-    }
-
-    // Transit Duration: 0.1 to 24 hours
-    const duration = Number.parseFloat(formData.transit_duration)
-    if (!formData.transit_duration || Number.isNaN(duration)) {
-      errors.transit_duration = "Required field"
-    } else if (duration < 0.1 || duration > 24) {
-      errors.transit_duration = "Must be between 0.1 and 24 hours"
-    }
-
-    // Transit Depth: 1 to 100000 ppm
-    const depth = Number.parseFloat(formData.transit_depth)
-    if (!formData.transit_depth || Number.isNaN(depth)) {
-      errors.transit_depth = "Required field"
-    } else if (depth < 1 || depth > 100000) {
-      errors.transit_depth = "Must be between 1 and 100000 ppm"
-    }
-
-    // Planet Radius: 0.1 to 30 Earth radii
-    const radius = Number.parseFloat(formData.planet_radius)
-    if (!formData.planet_radius || Number.isNaN(radius)) {
-      errors.planet_radius = "Required field"
-    } else if (radius < 0.1 || radius > 30) {
-      errors.planet_radius = "Must be between 0.1 and 30 Earth radii"
-    }
-
-    // Signal-to-Noise: 1 to 1000
-    const snr = Number.parseFloat(formData.signal_to_noise)
-    if (!formData.signal_to_noise || Number.isNaN(snr)) {
-      errors.signal_to_noise = "Required field"
-    } else if (snr < 1 || snr > 1000) {
-      errors.signal_to_noise = "Must be between 1 and 1000"
-    }
-
-    // KOI Score: 0 to 1
-    const score = Number.parseFloat(formData.koi_score)
-    if (!formData.koi_score || Number.isNaN(score)) {
-      errors.koi_score = "Required field"
-    } else if (score < 0 || score > 1) {
-      errors.koi_score = "Must be between 0 and 1"
-    }
-
-    setValidationErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
   const handlePredict = async () => {
-    if (!validateInputs()) {
-      setError("Please fix validation errors before submitting")
-      return
-    }
-
     setIsLoading(true)
     setError(null)
     setPrediction(null)
 
     try {
+      const payload: Record<string, number> = {}
+      Object.entries(formData).forEach(([key, value]) => {
+        const num = Number.parseFloat(value)
+        payload[key] = Number.isNaN(num) ? 0 : num
+      })
+
+      console.log("[v0] Sending prediction request:", payload)
+
       const response = await fetch("/api/predict", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          orbital_period: Number.parseFloat(formData.orbital_period),
-          transit_duration: Number.parseFloat(formData.transit_duration),
-          transit_depth: Number.parseFloat(formData.transit_depth),
-          planet_radius: Number.parseFloat(formData.planet_radius),
-          signal_to_noise: Number.parseFloat(formData.signal_to_noise),
-          koi_score: Number.parseFloat(formData.koi_score),
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
@@ -194,18 +150,58 @@ export function PredictionForm() {
     }
   }
 
+  const handleDownloadSample = async () => {
+    try {
+      console.log("[v0] Starting sample prediction data download...")
+      const response = await fetch("/api/download-prediction-sample")
+
+      if (!response.ok) {
+        throw new Error("Failed to download sample data")
+      }
+
+      console.log("[v0] Download response status:", response.status)
+
+      const blob = await response.blob()
+      console.log("[v0] Blob created, size:", blob.size)
+
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = "sample_prediction_data.csv"
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      console.log("[v0] Download triggered successfully")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to download sample data")
+      console.error("[v0] Download error:", err)
+    }
+  }
+
   return (
     <section id="predict" className="relative px-4 py-16">
       <div className="container relative z-10 mx-auto max-w-5xl">
         <div className="mb-12 text-center">
           <h2 className="mb-4 text-4xl font-bold text-foreground">Make a Prediction</h2>
-          <p className="text-lg text-muted-foreground">Input exoplanet candidate parameters or upload a CSV file</p>
+          <p className="text-lg text-muted-foreground">
+            Input observable exoplanet candidate parameters or upload a CSV file
+          </p>
+          <div className="mx-auto mt-4 max-w-2xl rounded-lg border border-primary/30 bg-primary/10 p-3">
+            <p className="text-sm text-foreground">
+              <strong>Note:</strong> This section is for making predictions on new data. If you want to train the model
+              with labeled data, scroll up to the "Train Model" section.
+            </p>
+          </div>
         </div>
 
         <Card className="border-border bg-card/50 backdrop-blur-sm">
           <CardHeader>
             <CardTitle>Exoplanet Classification</CardTitle>
-            <CardDescription>Enter the orbital and stellar parameters to classify the candidate</CardDescription>
+            <CardDescription>
+              Enter measurable parameters from your observations to classify the candidate
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="manual" className="w-full">
@@ -215,143 +211,235 @@ export function PredictionForm() {
               </TabsList>
 
               <TabsContent value="manual" className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="period">
-                      Orbital Period (days) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="period"
-                      type="number"
-                      placeholder="e.g., 365.25"
-                      className={`bg-input ${validationErrors.orbital_period ? "border-destructive" : ""}`}
-                      value={formData.orbital_period}
-                      onChange={(e) => handleInputChange("orbital_period", e.target.value)}
-                      min="0.1"
-                      max="10000"
-                      step="0.01"
-                    />
-                    {validationErrors.orbital_period && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.orbital_period}
-                      </p>
-                    )}
+                <div className="space-y-6">
+                  {/* Orbital & Transit Properties */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-foreground">Orbital & Transit Properties</h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_period">Orbital Period (days)</Label>
+                        <Input
+                          id="koi_period"
+                          type="number"
+                          step="0.001"
+                          placeholder="e.g., 365.25"
+                          value={formData.koi_period}
+                          onChange={(e) => handleInputChange("koi_period", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_duration">Transit Duration (hours)</Label>
+                        <Input
+                          id="koi_duration"
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 3.5"
+                          value={formData.koi_duration}
+                          onChange={(e) => handleInputChange("koi_duration", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_impact">Impact Parameter</Label>
+                        <Input
+                          id="koi_impact"
+                          type="number"
+                          step="0.001"
+                          placeholder="e.g., 0.5"
+                          value={formData.koi_impact}
+                          onChange={(e) => handleInputChange("koi_impact", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_depth">Transit Depth (ppm)</Label>
+                        <Input
+                          id="koi_depth"
+                          type="number"
+                          step="0.1"
+                          placeholder="e.g., 1000"
+                          value={formData.koi_depth}
+                          onChange={(e) => handleInputChange("koi_depth", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_prad">Planet Radius (Earth radii)</Label>
+                        <Input
+                          id="koi_prad"
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 1.2"
+                          value={formData.koi_prad}
+                          onChange={(e) => handleInputChange("koi_prad", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_insol">Insolation Flux (Earth flux)</Label>
+                        <Input
+                          id="koi_insol"
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 1.0"
+                          value={formData.koi_insol}
+                          onChange={(e) => handleInputChange("koi_insol", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_model_snr">Signal-to-Noise Ratio</Label>
+                        <Input
+                          id="koi_model_snr"
+                          type="number"
+                          step="0.1"
+                          placeholder="e.g., 35.5"
+                          value={formData.koi_model_snr}
+                          onChange={(e) => handleInputChange("koi_model_snr", e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">
-                      Transit Duration (hours) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      placeholder="e.g., 3.5"
-                      className={`bg-input ${validationErrors.transit_duration ? "border-destructive" : ""}`}
-                      value={formData.transit_duration}
-                      onChange={(e) => handleInputChange("transit_duration", e.target.value)}
-                      min="0.1"
-                      max="24"
-                      step="0.01"
-                    />
-                    {validationErrors.transit_duration && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.transit_duration}
-                      </p>
-                    )}
+                  {/* Stellar Properties */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-foreground">Stellar Properties</h3>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_srad">Stellar Radius (Solar radii)</Label>
+                        <Input
+                          id="koi_srad"
+                          type="number"
+                          step="0.001"
+                          placeholder="e.g., 1.0"
+                          value={formData.koi_srad}
+                          onChange={(e) => handleInputChange("koi_srad", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_steff">Effective Temperature (K)</Label>
+                        <Input
+                          id="koi_steff"
+                          type="number"
+                          step="1"
+                          placeholder="e.g., 5778"
+                          value={formData.koi_steff}
+                          onChange={(e) => handleInputChange("koi_steff", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_slogg">Surface Gravity (log g)</Label>
+                        <Input
+                          id="koi_slogg"
+                          type="number"
+                          step="0.001"
+                          placeholder="e.g., 4.44"
+                          value={formData.koi_slogg}
+                          onChange={(e) => handleInputChange("koi_slogg", e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="depth">
-                      Transit Depth (ppm) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="depth"
-                      type="number"
-                      placeholder="e.g., 1000"
-                      className={`bg-input ${validationErrors.transit_depth ? "border-destructive" : ""}`}
-                      value={formData.transit_depth}
-                      onChange={(e) => handleInputChange("transit_depth", e.target.value)}
-                      min="1"
-                      max="100000"
-                      step="1"
-                    />
-                    {validationErrors.transit_depth && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.transit_depth}
-                      </p>
-                    )}
+                  {/* False Positive Flags */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-foreground">False Positive Flags</h3>
+                    <div className="grid gap-4 md:grid-cols-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_fpflag_nt">Not Transit-Like (0 or 1)</Label>
+                        <Input
+                          id="koi_fpflag_nt"
+                          type="number"
+                          min="0"
+                          max="1"
+                          placeholder="0"
+                          value={formData.koi_fpflag_nt}
+                          onChange={(e) => handleInputChange("koi_fpflag_nt", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_fpflag_ss">Stellar Eclipse (0 or 1)</Label>
+                        <Input
+                          id="koi_fpflag_ss"
+                          type="number"
+                          min="0"
+                          max="1"
+                          placeholder="0"
+                          value={formData.koi_fpflag_ss}
+                          onChange={(e) => handleInputChange("koi_fpflag_ss", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_fpflag_co">Centroid Offset (0 or 1)</Label>
+                        <Input
+                          id="koi_fpflag_co"
+                          type="number"
+                          min="0"
+                          max="1"
+                          placeholder="0"
+                          value={formData.koi_fpflag_co}
+                          onChange={(e) => handleInputChange("koi_fpflag_co", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="koi_fpflag_ec">Ephemeris Match (0 or 1)</Label>
+                        <Input
+                          id="koi_fpflag_ec"
+                          type="number"
+                          min="0"
+                          max="1"
+                          placeholder="0"
+                          value={formData.koi_fpflag_ec}
+                          onChange={(e) => handleInputChange("koi_fpflag_ec", e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="radius">
-                      Planet Radius (Earth radii) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="radius"
-                      type="number"
-                      placeholder="e.g., 1.2"
-                      className={`bg-input ${validationErrors.planet_radius ? "border-destructive" : ""}`}
-                      value={formData.planet_radius}
-                      onChange={(e) => handleInputChange("planet_radius", e.target.value)}
-                      min="0.1"
-                      max="30"
-                      step="0.01"
-                    />
-                    {validationErrors.planet_radius && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.planet_radius}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="snr">
-                      Signal-to-Noise Ratio <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="snr"
-                      type="number"
-                      placeholder="e.g., 15.5"
-                      className={`bg-input ${validationErrors.signal_to_noise ? "border-destructive" : ""}`}
-                      value={formData.signal_to_noise}
-                      onChange={(e) => handleInputChange("signal_to_noise", e.target.value)}
-                      min="1"
-                      max="1000"
-                      step="0.1"
-                    />
-                    {validationErrors.signal_to_noise && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.signal_to_noise}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="score">
-                      KOI Score <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="score"
-                      type="number"
-                      placeholder="e.g., 0.85"
-                      step="0.01"
-                      className={`bg-input ${validationErrors.koi_score ? "border-destructive" : ""}`}
-                      value={formData.koi_score}
-                      onChange={(e) => handleInputChange("koi_score", e.target.value)}
-                      min="0"
-                      max="1"
-                    />
-                    {validationErrors.koi_score && (
-                      <p className="flex items-center gap-1 text-xs text-destructive">
-                        <AlertCircle className="h-3 w-3" />
-                        {validationErrors.koi_score}
-                      </p>
-                    )}
+                  {/* Positional Data */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-foreground">Sky Position & Motion</h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="ra">Right Ascension (degrees)</Label>
+                        <Input
+                          id="ra"
+                          type="number"
+                          step="0.0001"
+                          placeholder="e.g., 290.1234"
+                          value={formData.ra}
+                          onChange={(e) => handleInputChange("ra", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dec">Declination (degrees)</Label>
+                        <Input
+                          id="dec"
+                          type="number"
+                          step="0.0001"
+                          placeholder="e.g., 44.5678"
+                          value={formData.dec}
+                          onChange={(e) => handleInputChange("dec", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pm_ra">Proper Motion RA (mas/yr)</Label>
+                        <Input
+                          id="pm_ra"
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., -10.5"
+                          value={formData.pm_ra}
+                          onChange={(e) => handleInputChange("pm_ra", e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="pm_dec">Proper Motion Dec (mas/yr)</Label>
+                        <Input
+                          id="pm_dec"
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 5.2"
+                          value={formData.pm_dec}
+                          onChange={(e) => handleInputChange("pm_dec", e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -376,33 +464,32 @@ export function PredictionForm() {
               </TabsContent>
 
               <TabsContent value="upload" className="space-y-6">
+                <div className="mb-4 flex justify-end">
+                  <Button variant="outline" size="sm" onClick={handleDownloadSample}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Sample CSV
+                  </Button>
+                </div>
+
                 <div className="flex min-h-[300px] flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/20 p-12 text-center">
                   <Upload className="mb-4 h-12 w-12 text-muted-foreground" />
                   <h3 className="mb-2 text-lg font-semibold text-foreground">Upload CSV File</h3>
                   <p className="mb-4 text-sm text-muted-foreground">
-                    Drag and drop your CSV file here, or click to browse
+                    Upload a CSV file with observable exoplanet candidate parameters
                   </p>
                   <input
                     type="file"
-                    id="csv-upload"
+                    id="prediction-csv-upload"
                     className="hidden"
                     accept=".csv"
                     onChange={handleCSVUpload}
                     disabled={isLoading}
                   />
-                  <label htmlFor="csv-upload">
+                  <label htmlFor="prediction-csv-upload">
                     <Button variant="outline" asChild disabled={isLoading}>
                       <span>{isLoading ? "Processing..." : "Select File"}</span>
                     </Button>
                   </label>
-                  <div className="mt-4">
-                    <a href="/sample-training-data.csv" download>
-                      <Button variant="ghost" size="sm">
-                        <Download className="mr-2 h-4 w-4" />
-                        Download Sample CSV
-                      </Button>
-                    </a>
-                  </div>
                 </div>
               </TabsContent>
             </Tabs>
@@ -416,21 +503,21 @@ export function PredictionForm() {
             {prediction && (
               <div className="mt-6 rounded-lg border border-border bg-muted/20 p-6">
                 <div className="flex items-start gap-4">
-                  {prediction.prediction === "confirmed" ? (
+                  {prediction.prediction === "exoplanet" ? (
                     <CheckCircle2 className="h-8 w-8 text-chart-2" />
                   ) : (
                     <XCircle className="h-8 w-8 text-destructive" />
                   )}
                   <div className="flex-1">
                     <h3 className="mb-2 text-xl font-bold text-foreground">
-                      {prediction.prediction === "confirmed" ? "Confirmed Exoplanet" : "False Positive"}
+                      {prediction.prediction === "exoplanet" ? "Exoplanet Detected" : "Not an Exoplanet"}
                     </h3>
                     <p className="mb-4 text-muted-foreground">
                       Model confidence: {(prediction.confidence * 100).toFixed(1)}%
                     </p>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div
-                        className={`h-full ${prediction.prediction === "confirmed" ? "bg-chart-2" : "bg-destructive"}`}
+                        className={`h-full ${prediction.prediction === "exoplanet" ? "bg-chart-2" : "bg-destructive"}`}
                         style={{ width: `${prediction.confidence * 100}%` }}
                       />
                     </div>
@@ -449,108 +536,54 @@ export function PredictionForm() {
               <Sparkles className="h-6 w-6 text-primary" />
               Classification Results
             </DialogTitle>
-            <DialogDescription>
-              Analysis complete for {csvResults?.summary.total || 0} exoplanet candidates
-            </DialogDescription>
+            <DialogDescription>Analysis complete for {csvResults?.summary.total || 0} candidates</DialogDescription>
           </DialogHeader>
 
           {csvResults && (
             <div className="space-y-6">
-              {/* Summary Cards */}
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-lg border border-chart-2/30 bg-chart-2/10 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Confirmed</p>
-                      <p className="text-3xl font-bold text-chart-2">{csvResults.summary.confirmed}</p>
+                      <p className="text-sm text-muted-foreground">Exoplanets</p>
+                      <p className="text-3xl font-bold text-chart-2">{csvResults.summary.exoplanet}</p>
                     </div>
                     <CheckCircle2 className="h-8 w-8 text-chart-2" />
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {((csvResults.summary.confirmed / csvResults.summary.total) * 100).toFixed(1)}% of total
+                    {((csvResults.summary.exoplanet / csvResults.summary.total) * 100).toFixed(1)}% of total
                   </p>
                 </div>
 
                 <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">False Positives</p>
-                      <p className="text-3xl font-bold text-destructive">{csvResults.summary.false_positive}</p>
+                      <p className="text-sm text-muted-foreground">Not Exoplanets</p>
+                      <p className="text-3xl font-bold text-destructive">{csvResults.summary.not_exoplanet}</p>
                     </div>
                     <XCircle className="h-8 w-8 text-destructive" />
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {((csvResults.summary.false_positive / csvResults.summary.total) * 100).toFixed(1)}% of total
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Candidates</p>
-                      <p className="text-3xl font-bold text-primary">{csvResults.summary.candidate || 0}</p>
-                    </div>
-                    <TrendingUp className="h-8 w-8 text-primary" />
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {(((csvResults.summary.candidate || 0) / csvResults.summary.total) * 100).toFixed(1)}% of total
+                    {((csvResults.summary.not_exoplanet / csvResults.summary.total) * 100).toFixed(1)}% of total
                   </p>
                 </div>
               </div>
 
-              {/* Visual Progress Bar */}
               <div className="space-y-2">
                 <p className="text-sm font-medium text-foreground">Classification Distribution</p>
                 <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className="bg-chart-2"
                     style={{
-                      width: `${(csvResults.summary.confirmed / csvResults.summary.total) * 100}%`,
+                      width: `${(csvResults.summary.exoplanet / csvResults.summary.total) * 100}%`,
                     }}
                   />
                   <div
                     className="bg-destructive"
                     style={{
-                      width: `${(csvResults.summary.false_positive / csvResults.summary.total) * 100}%`,
+                      width: `${(csvResults.summary.not_exoplanet / csvResults.summary.total) * 100}%`,
                     }}
                   />
-                  <div
-                    className="bg-primary"
-                    style={{
-                      width: `${((csvResults.summary.candidate || 0) / csvResults.summary.total) * 100}%`,
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Confirmed Exoplanets</span>
-                  <span>False Positives</span>
-                  <span>Candidates</span>
-                </div>
-              </div>
-
-              {/* Statistics */}
-              <div className="rounded-lg border border-border bg-muted/20 p-4">
-                <h4 className="mb-3 font-semibold text-foreground">Analysis Summary</h4>
-                <div className="grid gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Candidates Processed:</span>
-                    <span className="font-medium text-foreground">{csvResults.summary.total}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Success Rate:</span>
-                    <span className="font-medium text-chart-2">
-                      {((csvResults.summary.confirmed / csvResults.summary.total) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Average Confidence:</span>
-                    <span className="font-medium text-foreground">
-                      {(
-                        csvResults.predictions.reduce((acc, p) => acc + p.confidence, 0) / csvResults.predictions.length
-                      ).toFixed(1)}
-                      %
-                    </span>
-                  </div>
                 </div>
               </div>
 

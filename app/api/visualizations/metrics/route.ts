@@ -1,20 +1,32 @@
 import { NextResponse } from "next/server"
+import { readFile } from "fs/promises"
+import { join } from "path"
 
 export async function GET() {
   try {
-    // Mock model metrics
-    const metrics = {
-      accuracy: 0.956,
-      precision: 0.948,
-      recall: 0.968,
-      f1_score: 0.958,
-      auc_roc: 0.982,
-      total_samples: 1850,
-      training_time: "2.3s",
-      model_type: "Random Forest",
-    }
+    const metricsFile = join(process.cwd(), "data", "latest_metrics.json")
 
-    return NextResponse.json(metrics)
+    try {
+      const data = await readFile(metricsFile, "utf-8")
+      const { metrics, timestamp } = JSON.parse(data)
+
+      return NextResponse.json({
+        ...metrics,
+        model_type: "Random Forest",
+        last_trained: timestamp,
+      })
+    } catch (fileError) {
+      console.log("[v0] No trained model metrics found, returning default")
+      return NextResponse.json({
+        accuracy: null,
+        precision: null,
+        recall: null,
+        f1_score: null,
+        total_samples: 0,
+        model_type: "Not trained",
+        message: "No model has been trained yet. Upload training data to begin.",
+      })
+    }
   } catch (error) {
     console.error("[v0] Metrics error:", error)
     return NextResponse.json({ error: "Failed to fetch metrics" }, { status: 500 })

@@ -16,8 +16,10 @@ interface Exoplanet {
   discoveryYear: number
   orbitalPeriod: number
   planetRadius: number
+  planetMass?: number
   stellarDistance: number
   equilibriumTemp: number
+  orbitalEccentricity?: number
   status: string
 }
 
@@ -55,7 +57,7 @@ export function ExoplanetGrid({ filters }: ExoplanetGridProps) {
         const params = new URLSearchParams()
 
         params.append("page", page.toString())
-        params.append("limit", "8")
+        params.append("limit", "6")
 
         if (filters?.query) {
           params.append("query", filters.query)
@@ -161,9 +163,9 @@ export function ExoplanetGrid({ filters }: ExoplanetGridProps) {
   }
 
   return (
-    <section className="relative z-10 py-12">
+    <section className="relative z-10 pb-12">
       <div className="container mx-auto px-4">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold">Discovered Exoplanets</h2>
             <p className="text-sm text-muted-foreground">
@@ -203,7 +205,7 @@ export function ExoplanetGrid({ filters }: ExoplanetGridProps) {
           </div>
         ) : (
           <>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {filteredPlanets.map((planet) => (
                 <ExoplanetCard
                   key={planet.id}
@@ -215,7 +217,7 @@ export function ExoplanetGrid({ filters }: ExoplanetGridProps) {
             </div>
 
             {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center gap-2">
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
                 <Button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1 || isSearching}

@@ -1,0 +1,68 @@
+import { NextResponse } from "next/server"
+
+export async function GET() {
+  try {
+    // Generate sample CSV data with only observable/measurable features
+    // These are features a researcher would actually measure, not metadata
+    const headers = [
+      "koi_period",
+      "koi_duration",
+      "koi_impact",
+      "koi_depth",
+      "koi_prad",
+      "koi_insol",
+      "koi_model_snr",
+      "koi_srad",
+      "koi_steff",
+      "koi_slogg",
+      "koi_fpflag_nt",
+      "koi_fpflag_ss",
+      "koi_fpflag_co",
+      "koi_fpflag_ec",
+      "ra",
+      "dec",
+      "pm_ra",
+      "pm_dec",
+    ]
+
+    // Generate 20 sample rows with realistic exoplanet candidate data
+    const rows: string[] = []
+
+    for (let i = 0; i < 20; i++) {
+      const row = [
+        String((1 + Math.random() * 500).toFixed(3)), // koi_period (days)
+        String((1 + Math.random() * 8).toFixed(2)), // koi_duration (hours)
+        String(Math.random().toFixed(3)), // koi_impact
+        String((100 + Math.random() * 5000).toFixed(1)), // koi_depth (ppm)
+        String((0.5 + Math.random() * 15).toFixed(2)), // koi_prad (Earth radii)
+        String((0.1 + Math.random() * 2000).toFixed(2)), // koi_insol (flux)
+        String((10 + Math.random() * 100).toFixed(1)), // koi_model_snr
+        String((0.5 + Math.random() * 2).toFixed(3)), // koi_srad (Solar radii)
+        String((4000 + Math.random() * 3000).toFixed(1)), // koi_steff (K)
+        String((3.5 + Math.random() * 1.5).toFixed(3)), // koi_slogg (log g)
+        String(Math.random() > 0.9 ? 1 : 0), // koi_fpflag_nt
+        String(Math.random() > 0.95 ? 1 : 0), // koi_fpflag_ss
+        String(Math.random() > 0.95 ? 1 : 0), // koi_fpflag_co
+        String(Math.random() > 0.95 ? 1 : 0), // koi_fpflag_ec
+        String((Math.random() * 360).toFixed(4)), // ra (degrees)
+        String((-90 + Math.random() * 180).toFixed(4)), // dec (degrees)
+        String((-50 + Math.random() * 100).toFixed(2)), // pm_ra (mas/yr)
+        String((-50 + Math.random() * 100).toFixed(2)), // pm_dec (mas/yr)
+      ]
+
+      rows.push(row.join(","))
+    }
+
+    const csv = [headers.join(","), ...rows].join("\n")
+
+    return new NextResponse(csv, {
+      headers: {
+        "Content-Type": "text/csv",
+        "Content-Disposition": 'attachment; filename="sample_prediction_data.csv"',
+      },
+    })
+  } catch (error) {
+    console.error("[v0] Error generating sample prediction data:", error)
+    return NextResponse.json({ error: "Failed to generate sample data" }, { status: 500 })
+  }
+}

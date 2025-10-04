@@ -44,7 +44,7 @@ export function ExoplanetSearch({ onSearch }: ExoplanetSearchProps) {
   }
 
   return (
-    <section className="relative z-10 py-12">
+    <section className="relative z-10 pt-6">
       <div className="container mx-auto px-4">
         <Card className="border-border/50 bg-card/50 p-6 backdrop-blur-sm">
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end">
