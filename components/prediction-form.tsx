@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Upload, Sparkles, CheckCircle2, XCircle, Loader2, Download } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface PredictionResult {
   prediction: "exoplanet" | "not-exoplanet"
@@ -26,6 +27,7 @@ interface CSVResults {
     not_exoplanet: number
   }
   predictions: Array<{
+    name: string
     prediction: string
     confidence: number
   }>
@@ -530,7 +532,7 @@ export function PredictionForm() {
       </div>
 
       <Dialog open={showResultsModal} onOpenChange={setShowResultsModal}>
-        <DialogContent className="max-w-2xl border-border bg-card/95 backdrop-blur-sm">
+        <DialogContent className="max-w-4xl border-border bg-card/95 backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-2xl">
               <Sparkles className="h-6 w-6 text-primary" />
@@ -585,6 +587,48 @@ export function PredictionForm() {
                     }}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Detailed Results</p>
+                <ScrollArea className="h-[300px] rounded-lg border border-border">
+                  <div className="p-4">
+                    <table className="w-full">
+                      <thead className="sticky top-0 bg-card">
+                        <tr className="border-b border-border">
+                          <th className="pb-2 text-left text-sm font-medium text-muted-foreground">Planet Name</th>
+                          <th className="pb-2 text-left text-sm font-medium text-muted-foreground">Classification</th>
+                          <th className="pb-2 text-right text-sm font-medium text-muted-foreground">Confidence</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {csvResults.predictions.map((pred, idx) => (
+                          <tr key={idx} className="border-b border-border/50 last:border-0">
+                            <td className="py-3 text-sm font-medium text-foreground">{pred.name}</td>
+                            <td className="py-3">
+                              <div className="flex items-center gap-2">
+                                {pred.prediction === "exoplanet" ? (
+                                  <>
+                                    <CheckCircle2 className="h-4 w-4 text-chart-2" />
+                                    <span className="text-sm text-chart-2">Exoplanet</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="h-4 w-4 text-destructive" />
+                                    <span className="text-sm text-destructive">Not Exoplanet</span>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 text-right text-sm text-muted-foreground">
+                              {(pred.confidence * 100).toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </ScrollArea>
               </div>
 
               <Button onClick={() => setShowResultsModal(false)} className="w-full" size="lg">

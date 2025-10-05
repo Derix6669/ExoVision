@@ -69,7 +69,7 @@ export default function Home() {
           <>
             <section className="relative px-4 py-16">
               <div className="container relative z-10 mx-auto max-w-5xl text-center">
-                <h1 className="mb-4 text-5xl font-bold text-foreground md:text-6xl">
+                <h1 className="glow-purple mb-4 text-5xl font-bold text-foreground md:text-6xl">
                   ExoVision <span className="text-primary">ML</span>
                 </h1>
                 <p className="text-xl text-muted-foreground">AI-Powered Exoplanet Classification System</p>

@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
     const header = lines[0].split(",").map((h) => h.trim())
     console.log("[v0] CSV headers:", header)
 
+    const nameColumnIndex = header.findIndex((h) => h.toLowerCase() === "name")
+    const hasNameColumn = nameColumnIndex !== -1
+    console.log("[v0] Name column found:", hasNameColumn, "at index:", nameColumnIndex)
+
     const columnMapping: Record<string, string> = {
       orbital_period: "koi_period",
       transit_duration: "koi_duration",
@@ -59,7 +63,11 @@ export async function POST(request: NextRequest) {
       const values = lines[i].split(",").map((v) => v.trim())
       const row: Record<string, number> = {}
 
+      const planetName = hasNameColumn ? values[nameColumnIndex] : `Row-${i}`
+
       header.forEach((col, idx) => {
+        if (col.toLowerCase() === "name") return
+
         const value = values[idx]
         const num = Number.parseFloat(value)
         const mappedCol = columnMapping[col] || col
@@ -84,6 +92,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (i <= 3) {
+        console.log(`[v0] Row ${i} name:`, planetName)
         console.log(`[v0] Row ${i} features:`, features)
       }
 
@@ -111,6 +120,7 @@ export async function POST(request: NextRequest) {
 
       predictions.push({
         row: i,
+        name: planetName,
         prediction: isConfirmed ? "exoplanet" : "not-exoplanet",
         confidence,
         probabilities: {

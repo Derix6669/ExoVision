@@ -63,10 +63,18 @@ export function ExoplanetStats() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "oklch(0.12 0.02 265)",
-                      border: "1px solid oklch(0.22 0.02 265)",
+                      backgroundColor: "rgba(0, 0, 0, 0.9)",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
                       borderRadius: "0.5rem",
-                      color: "oklch(0.98 0.01 265)",
+                      color: "#ffffff",
+                      padding: "8px 12px",
+                    }}
+                    itemStyle={{
+                      color: "#ffffff",
+                    }}
+                    labelStyle={{
+                      color: "#ffffff",
+                      fontWeight: 600,
                     }}
                   />
                 </PieChart>
@@ -91,10 +99,18 @@ export function ExoplanetStats() {
                   <YAxis stroke="oklch(0.65 0.01 265)" tick={{ fill: "oklch(0.65 0.01 265)", fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "oklch(0.12 0.02 265)",
-                      border: "1px solid oklch(0.22 0.02 265)",
+                      backgroundColor: "rgba(0, 0, 0, 0.9)",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
                       borderRadius: "0.5rem",
-                      color: "oklch(0.98 0.01 265)",
+                      color: "#ffffff",
+                      padding: "8px 12px",
+                    }}
+                    itemStyle={{
+                      color: "#ffffff",
+                    }}
+                    labelStyle={{
+                      color: "#ffffff",
+                      fontWeight: 600,
                     }}
                   />
                   <Bar dataKey="count" fill="oklch(0.65 0.25 280)" radius={[8, 8, 0, 0]} />
@@ -120,10 +136,18 @@ export function ExoplanetStats() {
                   <YAxis stroke="oklch(0.65 0.01 265)" tick={{ fill: "oklch(0.65 0.01 265)", fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "oklch(0.12 0.02 265)",
-                      border: "1px solid oklch(0.22 0.02 265)",
+                      backgroundColor: "rgba(0, 0, 0, 0.9)",
+                      border: "1px solid rgba(255, 255, 255, 0.2)",
                       borderRadius: "0.5rem",
-                      color: "oklch(0.98 0.01 265)",
+                      color: "#ffffff",
+                      padding: "8px 12px",
+                    }}
+                    itemStyle={{
+                      color: "#ffffff",
+                    }}
+                    labelStyle={{
+                      color: "#ffffff",
+                      fontWeight: 600,
                     }}
                   />
                   <Bar dataKey="count" fill="oklch(0.55 0.2 240)" radius={[8, 8, 0, 0]} />
